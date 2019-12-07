@@ -17,6 +17,11 @@ def convertBack(x, y, w, h):
 
 def cvDrawBoxes(detections, img):
     for detection in detections:
+        if detection[0].decode() != 'car' and detection[0].decode() != 'bus' and detection[0].decode() != 'truck':
+            continue
+
+        print("detected class: "+detection[0].decode())   
+        
         x, y, w, h = detection[2][0],\
             detection[2][1],\
             detection[2][2],\
@@ -81,7 +86,7 @@ def YOLO():
         except Exception:
             pass
     #cap = cv2.VideoCapture(0)
-    cap = cv2.VideoCapture("./photi-vision-data/parking01.mp4")
+    cap = cv2.VideoCapture("./photi-vision-data/parking03.mp4")
     cap.set(3, outputWidth)
     cap.set(4, outputHeight)
     out = cv2.VideoWriter(
