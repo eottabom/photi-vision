@@ -85,10 +85,11 @@ def YOLO():
     cap.set(3, outputWidth)
     cap.set(4, outputHeight)
     out = cv2.VideoWriter(
-        "./photi-vision-data/output.avi", cv2.VideoWriter_fourcc(*"MJPG"), 30.0,
+        "./photi-vision-data/output.mp4", cv2.VideoWriter_fourcc(*"MP4V"), 30.0,
         (outputWidth, outputHeight))
     print("Starting the YOLO loop...")
 
+    #darknet.set_gpu(0)
     # Create an image we reuse for each detect
     darknet_image = darknet.make_image(outputWidth,
                                        outputHeight,3)
