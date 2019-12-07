@@ -33,7 +33,8 @@ def cvDrawBoxes(detections, img):
                     [0, 255, 0], 2)
     return img
 
-
+outputWidth = 1920
+outputHeight = 1080
 netMain = None
 metaMain = None
 altNames = None
@@ -42,8 +43,8 @@ altNames = None
 def YOLO():
 
     global metaMain, netMain, altNames
-    configPath = "./cfg/yolov3.cfg"
-    weightPath = "./yolov3.weights"
+    configPath = "./cfg/yolov3-spp.cfg"
+    weightPath = "./photi-vision-data/yolov3-spp.weights"
     metaPath = "./cfg/coco.data"
     if not os.path.exists(configPath):
         raise ValueError("Invalid config path `" +
@@ -80,24 +81,28 @@ def YOLO():
         except Exception:
             pass
     #cap = cv2.VideoCapture(0)
-    cap = cv2.VideoCapture("test.mp4")
-    cap.set(3, 1280)
-    cap.set(4, 720)
+    cap = cv2.VideoCapture("./photi-vision-data/parking01.mp4")
+    cap.set(3, outputWidth)
+    cap.set(4, outputHeight)
     out = cv2.VideoWriter(
-        "output.avi", cv2.VideoWriter_fourcc(*"MJPG"), 10.0,
-        (darknet.network_width(netMain), darknet.network_height(netMain)))
+        "./photi-vision-data/output.avi", cv2.VideoWriter_fourcc(*"MJPG"), 30.0,
+        (outputWidth, outputHeight))
     print("Starting the YOLO loop...")
 
     # Create an image we reuse for each detect
-    darknet_image = darknet.make_image(darknet.network_width(netMain),
-                                    darknet.network_height(netMain),3)
+    darknet_image = darknet.make_image(outputWidth,
+                                       outputHeight,3)
     while True:
         prev_time = time.time()
         ret, frame_read = cap.read()
+
+        if ret == False:
+           break
+
         frame_rgb = cv2.cvtColor(frame_read, cv2.COLOR_BGR2RGB)
         frame_resized = cv2.resize(frame_rgb,
-                                   (darknet.network_width(netMain),
-                                    darknet.network_height(netMain)),
+                                   (outputWidth,
+                                    outputHeight),
                                    interpolation=cv2.INTER_LINEAR)
 
         darknet.copy_image_from_bytes(darknet_image,frame_resized.tobytes())
@@ -105,8 +110,9 @@ def YOLO():
         detections = darknet.detect_image(netMain, metaMain, darknet_image, thresh=0.25)
         image = cvDrawBoxes(detections, frame_resized)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        out.write(image)
         print(1/(time.time()-prev_time))
-        cv2.imshow('Demo', image)
+        #cv2.imshow('Demo', image)
         cv2.waitKey(3)
     cap.release()
     out.release()
