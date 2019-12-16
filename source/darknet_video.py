@@ -6,6 +6,31 @@ import cv2
 import numpy as np
 import time
 import darknet
+import matplotlib.pyplot as plt
+
+def bb_intersection_over_union(boxA, boxB):
+    xA = max(boxA[0], boxB[0])
+    yA = max(boxA[1], boxB[1])
+    xB = min(boxA[2], boxB[2])
+    yB = min(boxA[3], boxB[3])
+
+    interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
+
+    boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
+    boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
+
+    iou = interArea / float(boxAArea + boxBArea - interArea)
+    
+    centerX = int((xA + xB)/2)
+    centerY = int((yA + yB)/2)
+
+    startX = int((xA + centerX) / 2)
+    startY = int((yA + centerY) / 2)
+
+    endX = int((xB + centerX) / 2)
+    endY = int((yB + centerY) / 2)
+    
+    return iou, (centerX, centerY), (startX, startY), (endX, endY)
 
 def convertBack(x, y, w, h):
     xmin = int(round(x - (w / 2)))
@@ -14,29 +39,37 @@ def convertBack(x, y, w, h):
     ymax = int(round(y + (h / 2)))
     return xmin, ymin, xmax, ymax
 
-
 def cvDrawBoxes(detections, img):
+    #     print('detections length : ', len(detections))
+    pt1 = (0, 0)
+    pt2 = (0, 0)
+    area = 0
+    
+    xmin = 0
+    ymin = 0
+    xmax = 0
+    ymax = 0
+    
     for detection in detections:
-        if detection[0].decode() != 'car' and detection[0].decode() != 'bus' and detection[0].decode() != 'truck':
+        if detection[0].decode() != 'car': # and detection[0].decode() != 'bus' and detection[0].decode() != 'truck':
             continue
 
-        print("detected class: "+detection[0].decode())   
-        
         x, y, w, h = detection[2][0],\
             detection[2][1],\
             detection[2][2],\
             detection[2][3]
-        xmin, ymin, xmax, ymax = convertBack(
-            float(x), float(y), float(w), float(h))
+        xmin, ymin, xmax, ymax = convertBack( float(x), float(y), float(w), float(h))
         pt1 = (xmin, ymin)
         pt2 = (xmax, ymax)
-        cv2.rectangle(img, pt1, pt2, (0, 255, 0), 1)
+        cv2.rectangle(img, pt1, pt2, (0, 255, 0), 3)
+        #         cv2.rectangle(img, (xmin, ymin), (xmax, ymax), (0, 255, 0), -1)
         cv2.putText(img,
                     detection[0].decode() +
                     " [" + str(round(detection[1] * 100, 2)) + "]",
                     (pt1[0], pt1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     [0, 255, 0], 2)
-    return img
+        area = (ymax-ymin) * (xmax-xmin)
+    return img, area, (xmin, ymin, xmax, ymax)
 
 outputWidth = 1920
 outputHeight = 1080
@@ -44,9 +77,7 @@ netMain = None
 metaMain = None
 altNames = None
 
-
 def YOLO():
-
     global metaMain, netMain, altNames
     configPath = "./cfg/yolov3-spp.cfg"
     weightPath = "./photi-vision-data/yolov3-spp.weights"
@@ -86,11 +117,11 @@ def YOLO():
         except Exception:
             pass
     #cap = cv2.VideoCapture(0)
-    cap = cv2.VideoCapture("./photi-vision-data/parking03.mp4")
+    cap = cv2.VideoCapture("./photi-vision-data/my_parking_lot_02.mp4")
     cap.set(3, outputWidth)
     cap.set(4, outputHeight)
     out = cv2.VideoWriter(
-        "./photi-vision-data/output.mp4", cv2.VideoWriter_fourcc(*"MP4V"), 30.0,
+        "./photi-vision-data/output-test-3.mp4", cv2.VideoWriter_fourcc(*"MP4V"), 30.0,
         (outputWidth, outputHeight))
     print("Starting the YOLO loop...")
 
@@ -98,12 +129,26 @@ def YOLO():
     # Create an image we reuse for each detect
     darknet_image = darknet.make_image(outputWidth,
                                        outputHeight,3)
+
+    point1 = (0, 0)
+    point2 = (0, 0)
+    A = (point1, point2)
+    AREA = 1
+    X0, Y0, X1, Y1 = [0,0,0,0]
+    rectangleA = (0, 0, 0, 0)
+
+    #temp_images = []
+    temp_rectangles = []
+
+    free_space_frames = 0
+
     while True:
+        temp_rectangles.clear()
         prev_time = time.time()
         ret, frame_read = cap.read()
 
         if ret == False:
-           break
+            break
 
         frame_rgb = cv2.cvtColor(frame_read, cv2.COLOR_BGR2RGB)
         frame_resized = cv2.resize(frame_rgb,
@@ -114,12 +159,51 @@ def YOLO():
         darknet.copy_image_from_bytes(darknet_image,frame_resized.tobytes())
 
         detections = darknet.detect_image(netMain, metaMain, darknet_image, thresh=0.25)
-        image = cvDrawBoxes(detections, frame_resized)
+        image, area, rectangleB = cvDrawBoxes(detections, frame_resized)
+
+        for detection in detections:
+            if detection[0].decode() != 'car': # and detection[0].decode() != 'bus' and detection[0].decode() != 'truck':
+                continue
+
+            x, y, w, h = detection[2][0],\
+                detection[2][1],\
+                detection[2][2],\
+                detection[2][3]
+            xmin, ymin, xmax, ymax = convertBack( float(x), float(y), float(w), float(h))
+
+            temp_rectangles.append((xmin, ymin, xmax, ymax))
+
+        num_of_bb = len(temp_rectangles)
+        print("number of bounding box in current scene:"+str(len(temp_rectangles)))
+
+        free_space = False
+
+        for i in range(0, len(temp_rectangles)):
+            for j in range(0, len(temp_rectangles)):
+                try:
+                    iou, center, start, end = bb_intersection_over_union(temp_rectangles[i], temp_rectangles[j])
+                    #print('::::', iou, '::::', center, '::::::', temp_rectangles[i] , '::::::', temp_rectangles[j])
+                except ZeroDivisionError:
+                    print("ZeroDivision")
+                if iou <= 0.05 and iou > 0:
+                    free_space = True
+                    cv2.rectangle(image, start, end, (0,0,255), -1)
+
+        if free_space:
+            free_space_frames += 1
+        else:
+            free_space_frames = 0
+
+        if free_space_frames > 10:
+             print("Empty space exits!")
+             font = cv2.FONT_HERSHEY_DUPLEX
+             cv2.putText(image, f"SPACE AVAILABLE!", (10, 150), font, 3.0, (0, 255, 0), 2, cv2.FILLED)
+
+
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         out.write(image)
-        print(1/(time.time()-prev_time))
-        #cv2.imshow('Demo', image)
         cv2.waitKey(3)
+
     cap.release()
     out.release()
 
