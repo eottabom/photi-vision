@@ -7,6 +7,7 @@ import numpy as np
 import time
 import darknet
 import matplotlib.pyplot as plt
+import skimage
 
 def bb_center_dist(bb1, bb2):
     x1 = bb1[0]
@@ -134,7 +135,7 @@ def YOLO():
         except Exception:
             pass
     #cap = cv2.VideoCapture(0)
-    cap = cv2.VideoCapture("./photi-vision-data/parking04_edit.mp4")
+    cap = cv2.VideoCapture("./photi-vision-data/parking_edit_04.mp4")
     cap.set(3, outputWidth)
     cap.set(4, outputHeight)
     out = cv2.VideoWriter(
@@ -159,6 +160,9 @@ def YOLO():
     temp_centers = []
 
     free_space_frames = 0
+    
+    park_zone_img_path = '/data/git/photi-vision/resource/image/park_zone_115.jpg'
+    park_zone_img = skimage.io.imread(park_zone_img_path)
 
     while True:
         temp_centers.clear()
@@ -229,12 +233,27 @@ def YOLO():
                     #print('::::', iou, '::::', center, '::::::', temp_rectangles[i] , '::::::', temp_rectangles[j])
                 except ZeroDivisionError:
                     print("ZeroDivision")
-                if iou <= 0.05 and iou > 0 and dist <= 320:
+                if iou <= 0.05 and iou > 0 and dist <= 310:
                     free_space = True
-                    print("Free space exits!")
-                    cv2.rectangle(image, start, end, (255,0,0), -1)
-                    #cv2.line(image, (temp_rectangles[i][0], temp_rectangles[i][3]), (temp_rectangles[j][0], temp_rectangles[j][3]), (255,0,0), 2)
-                    #cv2.line(image, (temp_rectangles[i][2], temp_rectangles[i][3]), (temp_rectangles[j][2], temp_rectangles[j][3]), (255,0,0), 2)
+                    rows, cols, channels = park_zone_img.shape
+                    
+                    x = start[0]-50
+                    y = start[1]-50
+                    
+                    roi = image[y:y+rows, x:x+cols]
+                    
+                    if roi.shape[0] == cols and roi.shape[1] == rows:
+                        gray_park_zone_img = cv2.cvtColor(park_zone_img, cv2.COLOR_BGR2GRAY)
+                        ret, mask = cv2.threshold(gray_park_zone_img, 50, 255, cv2.THRESH_BINARY)
+                        mask_inv = cv2.bitwise_not(mask)
+
+                        park_zone_bg = cv2.bitwise_and(roi, roi, mask=mask_inv)
+                        park_zone_fg = cv2.bitwise_and(park_zone_img, park_zone_img, mask=mask)
+
+                        dst = cv2.add(park_zone_bg, park_zone_fg)
+
+                        image[y:y+rows, x:x+cols] = dst
+#                     cv2.rectangle(image, start, end, (0,0,255), -1)
 
         if free_space:
             free_space_frames += 1
@@ -242,10 +261,9 @@ def YOLO():
             free_space_frames = 0
 
         if free_space_frames > 10:
-             print("Empty space exits!")
-             font = cv2.FONT_HERSHEY_DUPLEX
-             cv2.putText(image, f"SPACE AVAILABLE!", (10, 150), font, 3.0, (0, 255, 0), 2, cv2.FILLED)
-
+            print("Empty space exits!")
+            font = cv2.FONT_HERSHEY_DUPLEX
+            cv2.putText(image, "SPACE AVAILABLE!", (10, 150), font, 3.0, (0, 255, 0), 2, cv2.FILLED)
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         out.write(image)
