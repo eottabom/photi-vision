@@ -44,7 +44,7 @@ def bb_intersection_over_union(boxA, boxB):
     endX = int((xB + centerX) / 2)
     endY = int((yB + centerY) / 2)
     
-    return iou, (centerX, centerY), (startX, startY), (endX, endY)
+    return iou, (centerX, centerY), (startX, startY), (endX, endY), interArea
 
 def convertBack(x, y, w, h):
     xmin = int(round(x - (w / 2)))
@@ -135,7 +135,8 @@ def YOLO():
         except Exception:
             pass
     #cap = cv2.VideoCapture(0)
-    cap = cv2.VideoCapture("./photi-vision-data/parking_edit_04.mp4")
+#     cap = cv2.VideoCapture("./photi-vision-data/parking_edit_04.mp4")
+    cap = cv2.VideoCapture("./photi-vision-data/parking03_edit.mp4")
     cap.set(3, outputWidth)
     cap.set(4, outputHeight)
     out = cv2.VideoWriter(
@@ -225,15 +226,18 @@ def YOLO():
         for i in range(0, len(temp_rectangles)):
             for j in range(0, len(temp_rectangles)):
                 try:
-                    iou, center, start, end = bb_intersection_over_union(temp_rectangles[i], temp_rectangles[j])
+                    iou, center, start, end, interArea = bb_intersection_over_union(temp_rectangles[i], temp_rectangles[j])
                     dist = bb_center_dist(temp_centers[i], temp_centers[j])
+                    temp_dist = end[0]-start[0]
+#                     print('temp_dist :::' , temp_dist, '::::', temp_area )
                     #area_i = bb_area(temp_rectangles[i])
                     #area_j = bb_area(temp_rectangles[j])
                     #print('dist:', dist)
                     #print('::::', iou, '::::', center, '::::::', temp_rectangles[i] , '::::::', temp_rectangles[j])
                 except ZeroDivisionError:
                     print("ZeroDivision")
-                if iou <= 0.05 and iou > 0 and dist <= 310:
+                if iou <= 0.06 and iou > 0.02 and dist <= 350 and interArea >= 2600 and temp_dist > 25:
+                    print(temp_dist, '::::::' ,interArea)
                     free_space = True
                     rows, cols, channels = park_zone_img.shape
                     
@@ -251,7 +255,7 @@ def YOLO():
                         park_zone_fg = cv2.bitwise_and(park_zone_img, park_zone_img, mask=mask)
 
                         dst = cv2.add(park_zone_bg, park_zone_fg)
-
+                        
                         image[y:y+rows, x:x+cols] = dst
 #                     cv2.rectangle(image, start, end, (0,0,255), -1)
 
