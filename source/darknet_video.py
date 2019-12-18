@@ -7,7 +7,7 @@ import numpy as np
 import time
 import darknet
 import matplotlib.pyplot as plt
-import skimage
+import skimage.io
 
 def bb_center_dist(bb1, bb2):
     x1 = bb1[0]
@@ -163,6 +163,7 @@ def YOLO():
     free_space_frames = 0
     
     park_zone_img_path = '/data/git/photi-vision/resource/image/park_zone_115.jpg'
+    #park_zone_img_path = './resource/image/park_zone_115.jpg'
     park_zone_img = skimage.io.imread(park_zone_img_path)
 
     while True:

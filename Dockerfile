@@ -9,5 +9,6 @@ RUN mkdir /workspace
 WORKDIR /workspace
 ADD entrypoint.sh /workspace
 ADD ./source /workspace/
+ADD ./resource /workspace/resource/
 RUN make
 ENTRYPOINT ["/bin/bash", "entrypoint.sh"]
